@@ -22,6 +22,10 @@
 
 #include <uxr/agent/middleware/utils/Callbacks.hpp>
 
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+#include <uxr/agent/datareader/DataReader.hpp>
+#endif // defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+
 namespace eprosima {
 namespace uxr {
 
@@ -209,6 +213,13 @@ bool FastDDSMiddleware::create_topic_by_ref(
     fastrtps::TopicAttributes attrs;
     if (XMLP_ret::XML_OK == XMLProfileManager::fillTopicAttributes(ref, attrs))
     {
+#if defined(UAGENT_RESTRICT)
+        std::string topic_name = attrs.getTopicName().c_str();
+        DataReader::topic_info_.push_back({topic_id, topic_name, 1000, 0});
+#elif defined(UAGENT_PROTECT)
+        std::string topic_name = attrs.getTopicName().c_str();
+        DataReader::topic_info_.push_back({topic_id, topic_name, 0.0001});
+#endif
         auto it_participant = participants_.find(participant_id);
         if (participants_.end() != it_participant)
         {
@@ -226,6 +237,13 @@ bool FastDDSMiddleware::create_topic_by_xml(
 {
     bool rv = false;
     fastrtps::TopicAttributes attrs;
+#if defined(UAGENT_RESTRICT)
+    std::string topic_name = attrs.getTopicName().c_str();
+    DataReader::topic_info_.push_back({topic_id, topic_name, 1000, 0});
+#elif defined(UAGENT_PROTECT)
+    std::string topic_name = attrs.getTopicName().c_str();
+    DataReader::topic_info_.push_back({topic_id, topic_name, 0.001});
+#endif
     if (xmlobjects::parse_topic(xml.data(), xml.size(), attrs))
     {
         auto it_participant = participants_.find(participant_id);
@@ -243,6 +261,13 @@ bool FastDDSMiddleware::create_topic_by_bin(
         uint16_t participant_id,
         const dds::xrce::OBJK_Topic_Binary& topic_xrce)
 {
+#if defined(UAGENT_RESTRICT)
+    std::string topic_name = topic_xrce.topic_name().c_str();
+    DataReader::topic_info_.push_back({topic_id, topic_name, 1000, 0});
+#elif defined(UAGENT_PROTECT)
+    std::string topic_name = topic_xrce.topic_name().c_str();
+    DataReader::topic_info_.push_back({topic_id, topic_name, 0.001});
+#endif
     bool rv = false;
     auto it_participant = participants_.find(participant_id);
     if (participants_.end() != it_participant)

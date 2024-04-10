@@ -17,6 +17,9 @@
 
 #include <uxr/agent/object/XRCEObject.hpp>
 #include <uxr/agent/reader/Reader.hpp>
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+#include <map>
+#endif
 
 namespace eprosima {
 namespace uxr {
@@ -62,9 +65,31 @@ private:
         std::vector<uint8_t>& data,
         std::chrono::milliseconds timeout);
 
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+    std::chrono::system_clock::time_point get_read_time() const;
+#endif
+
 private:
     std::shared_ptr<ProxyClient> proxy_client_;
     Reader<bool> reader_;
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+public:
+	struct TopicInfo
+	{
+		uint16_t objectID;
+		std::string TopicName;
+		float frequency;
+#ifdef UAGENT_RESTRICT
+		int count;
+#endif
+	};
+
+	std::map<uint16_t, std::chrono::system_clock::time_point> read_times_;
+	static std::vector<std::string> topic_frequency_array;
+	static std::vector<TopicInfo> topic_info_;
+	static int topic_count;
+	static std::vector<float> frequency;
+#endif
 };
 
 } // namespace uxr

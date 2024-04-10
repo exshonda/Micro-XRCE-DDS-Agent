@@ -22,6 +22,13 @@
 namespace eprosima {
 namespace uxr {
 
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+std::vector<std::string> DataReader::topic_frequency_array;
+std::vector<DataReader::TopicInfo> DataReader::topic_info_;
+int DataReader::topic_count;
+std::vector<float> DataReader::frequency;
+#endif
+
 std::unique_ptr<DataReader> DataReader::create(
         const dds::xrce::ObjectId& object_id,
         uint16_t subscriber_id,
@@ -30,7 +37,34 @@ std::unique_ptr<DataReader> DataReader::create(
 {
     bool created_entity = false;
     uint16_t raw_object_id = conversion::objectid_to_raw(object_id);
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+    std::string topic_name = "";
 
+    for (const auto &topic : topic_info_)
+    {
+        if (topic.objectID == raw_object_id)
+        {
+            topic_name = topic.TopicName;
+        }
+    }
+
+    std::vector<float> matched_next_values;
+
+    for (size_t i = 0; i < topic_frequency_array.size(); ++i)
+    {
+        if (topic_frequency_array[i].compare(topic_name) == 0 && i + 1 < topic_frequency_array.size())
+        {
+            for (auto &topic : topic_info_)
+            {
+                if (topic.objectID == raw_object_id)
+                {
+                    topic.frequency = std::stof(topic_frequency_array[i + 1]);
+                    break;
+                }
+            }
+        }
+    }
+#endif
     Middleware& middleware = proxy_client->get_middleware();
     switch (representation.representation()._d())
     {
@@ -175,6 +209,24 @@ bool DataReader::read_fn(
     bool rv = false;
     if (proxy_client_->get_middleware().read_data(get_raw_id(), data, timeout))
     {
+#if defined(UAGENT_RESTRICT)
+        for (auto &topic : topic_info_)
+        {
+            if (topic.objectID == get_raw_id())
+            {
+                if (topic.frequency == 1000){
+                    UXR_AGENT_LOG_MESSAGE(
+                        UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
+                        get_raw_id(),
+                        data.data(),
+                        data.size());
+                    rv = true;
+                }
+            }
+            else
+            {
+                if (topic.count < topic.frequency)
+                {
         UXR_AGENT_LOG_MESSAGE(
             UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
             get_raw_id(),
@@ -182,8 +234,62 @@ bool DataReader::read_fn(
             data.size());
         rv = true;
     }
+                else
+                {
+                    topic.count = 0;
+                    break;
+                }
+            }
+        }
+#elif defined(UAGENT_PROTECT)
+        std::chrono::duration<double> diff = std::chrono::system_clock::now() - read_times_[get_raw_id()];
+        float frequency_ = 0.001;
+        for (const auto &topic : topic_info_)
+        {
+            if (topic.objectID == get_raw_id())
+            {
+                frequency_ = topic.frequency;
+                break;
+            }
+        }
+
+        if (diff.count() > frequency_)
+        {
+            read_times_[get_raw_id()] = std::chrono::system_clock::now();
+
+            UXR_AGENT_LOG_MESSAGE(
+                UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
+                get_raw_id(),
+                data.data(),
+                data.size());
+            rv = true;
+        }
+#else
+        UXR_AGENT_LOG_MESSAGE(
+            UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
+            get_raw_id(),
+            data.data(),
+            data.size());
+        rv = true;
+#endif
+    }
     return rv;
 }
+
+#if defined(UAGENT_PROTECT)
+std::chrono::system_clock::time_point DataReader::get_read_time() const
+{
+    auto it = read_times_.find(get_raw_id());
+    if (it != read_times_.end())
+    {
+        return it->second;
+    }
+    else
+    {
+        return std::chrono::system_clock::time_point();
+    }
+}
+#endif
 
 } // namespace uxr
 } // namespace eprosima

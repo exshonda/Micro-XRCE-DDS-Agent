@@ -29,6 +29,8 @@ namespace uxr {
 #endif
 #cmakedefine UAGENT_SOCKETCAN_PROFILE
 #cmakedefine UAGENT_LOGGER_PROFILE
+#cmakedefine UAGENT_RESTRICT
+#cmakedefine UAGENT_PROTECT
 
 const uint16_t DISCOVERY_PORT = 7400;
 const char* const DISCOVERY_IP = "239.255.0.2";

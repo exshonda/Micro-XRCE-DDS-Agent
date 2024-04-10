@@ -43,6 +43,10 @@
 #include <uxr/agent/transport/can/CanAgentLinux.hpp>
 #endif // UAGENT_SOCKETCAN_PROFILE
 
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+#include <uxr/agent/datareader/DataReader.hpp>
+#endif // defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+
 #include <termios.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -469,6 +473,9 @@ public:
         , refs_("-r", "--refs")
         , verbose_("-v", "--verbose", static_cast<uint16_t>(DEFAULT_VERBOSE_LEVEL),
             {0, 1, 2, 3, 4, 5, 6})
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+        , topic_("-t", "--topic")
+#endif
 #ifdef UAGENT_DISCOVERY_PROFILE
         , discovery_("-d", "--discovery", static_cast<uint16_t>(DEFAULT_DISCOVERY_PORT), {}, false)
 #endif
@@ -528,6 +535,40 @@ public:
             result.first = false;
             return result;
         }
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+        ParseResult topic = topic_.parse_argument(argc, argv);
+        if (ParseResult::VALID == topic)
+        {
+            struct stat tp;
+            if (stat(topic_.value().c_str(), &tp) < 0){
+                std::cerr << "Error: reference file '" << refs_.value() << "' does not exist!" << std::endl;
+                result.first = false;
+                return result;
+            }
+            else{
+                std::ifstream file(topic_.value());
+                std::string line;
+                while (std::getline(file, line))
+                {
+                    std::string token;
+                    std::istringstream tokenStream(line);
+                    while (std::getline(tokenStream, token, ','))
+                    {
+                        DataReader::topic_frequency_array.push_back(token);
+                    }
+                }
+                for (size_t i = 0; i < DataReader::topic_frequency_array.size(); i++)
+                {
+                    std::cout << DataReader::topic_frequency_array[i] << std::endl;
+                }
+            }
+        }
+        else if (ParseResult::INVALID == topic)
+        {
+            result.first = false;
+            return result;
+        }
+#endif
 #ifdef UAGENT_DISCOVERY_PROFILE
         if (ParseResult::INVALID == discovery_.parse_argument(argc, argv))
         {
@@ -611,6 +652,9 @@ private:
     Argument<std::string> middleware_;
     Argument<std::string> refs_;
     Argument<uint8_t> verbose_;
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+    Argument<std::string> topic_;
+#endif
 #ifdef UAGENT_DISCOVERY_PROFILE
     Argument<uint16_t> discovery_;
 #endif
