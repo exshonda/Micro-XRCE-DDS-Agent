@@ -87,8 +87,8 @@ public:
 	std::map<uint16_t, std::chrono::system_clock::time_point> read_times_;
 	static std::vector<std::string> topic_frequency_array;
 	static std::vector<TopicInfo> topic_info_;
-	static int topic_count;
-	static std::vector<float> frequency;
+	int topic_count;
+	float frequency;
 #endif
 };
 

@@ -18,6 +18,7 @@
 #include <uxr/agent/client/ProxyClient.hpp>
 #include <uxr/agent/utils/TokenBucket.hpp>
 #include <uxr/agent/logger/Logger.hpp>
+#include <iostream>
 
 namespace eprosima {
 namespace uxr {
@@ -25,8 +26,6 @@ namespace uxr {
 #if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
 std::vector<std::string> DataReader::topic_frequency_array;
 std::vector<DataReader::TopicInfo> DataReader::topic_info_;
-int DataReader::topic_count;
-std::vector<float> DataReader::frequency;
 #endif
 
 std::unique_ptr<DataReader> DataReader::create(
@@ -37,34 +36,7 @@ std::unique_ptr<DataReader> DataReader::create(
 {
     bool created_entity = false;
     uint16_t raw_object_id = conversion::objectid_to_raw(object_id);
-#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
     std::string topic_name = "";
-
-    for (const auto &topic : topic_info_)
-    {
-        if (topic.objectID == raw_object_id)
-        {
-            topic_name = topic.TopicName;
-        }
-    }
-
-    std::vector<float> matched_next_values;
-
-    for (size_t i = 0; i < topic_frequency_array.size(); ++i)
-    {
-        if (topic_frequency_array[i].compare(topic_name) == 0 && i + 1 < topic_frequency_array.size())
-        {
-            for (auto &topic : topic_info_)
-            {
-                if (topic.objectID == raw_object_id)
-                {
-                    topic.frequency = std::stof(topic_frequency_array[i + 1]);
-                    break;
-                }
-            }
-        }
-    }
-#endif
     Middleware& middleware = proxy_client->get_middleware();
     switch (representation.representation()._d())
     {
@@ -92,14 +64,44 @@ std::unique_ptr<DataReader> DataReader::create(
             eprosima::fastcdr::Cdr cdr(fastbuffer, endianness, eprosima::fastcdr::CdrVersion::XCDRv1);
             datareader_xrce.deserialize(cdr);
 
-            created_entity = proxy_client->get_middleware().create_datareader_by_bin(raw_object_id, subscriber_id, datareader_xrce);
+            created_entity = proxy_client->get_middleware().create_datareader_by_bin(raw_object_id, subscriber_id, topic_name, datareader_xrce);
             break;
         }
         default:
             break;
     }
+    if(!created_entity)
+    {
+        return nullptr;
+    }
 
-    return (created_entity ? std::unique_ptr<DataReader>(new DataReader(object_id, proxy_client)) : nullptr);
+    DataReader* dr = new DataReader(object_id, proxy_client);
+#if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
+    std::cout << "[DR] listing topic..." << std::endl;
+    for (const auto &topic : topic_info_)
+    {
+        std::cout << "[DR] topic.objectID:" << topic.objectID << " TopicName:" << topic.TopicName << std::endl;
+    }
+    std::cout << "-----------" << std::endl;
+    std::cout << "[DR] raw_object_id:" << raw_object_id << " subscriber_id:" << subscriber_id << std::endl;
+    std::cout << "[DR] topic_name = " << topic_name << std::endl;
+
+    std::vector<float> matched_next_values;
+
+    for (size_t i = 0; i < topic_frequency_array.size(); ++i)
+    {
+        std::cout << "[DR] topic_frequency_array[" << i << "] = '" << topic_frequency_array[i] << "'" << std::endl;
+        if (topic_frequency_array[i] == topic_name && i + 1 < topic_frequency_array.size())
+        {
+            std::cout << "[DR] topic_frequency_array[" << i + 1 << "] = '" << topic_frequency_array[i + 1] << "'" << std::endl;
+            dr->frequency = std::stof(topic_frequency_array[i + 1]);
+            std::cout << "[DR] frequency = " << dr->frequency << std::endl;
+            break;
+        }
+        std::cout << "-----------" << std::endl;
+    }
+#endif
+    return std::unique_ptr<DataReader>(dr);
 }
 
 DataReader::DataReader(
@@ -210,50 +212,41 @@ bool DataReader::read_fn(
     if (proxy_client_->get_middleware().read_data(get_raw_id(), data, timeout))
     {
 #if defined(UAGENT_RESTRICT)
-        for (auto &topic : topic_info_)
+        if (frequency == 0)
         {
-            if (topic.objectID == get_raw_id())
-            {
-                if (topic.frequency == 1000){
-                    UXR_AGENT_LOG_MESSAGE(
-                        UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
-                        get_raw_id(),
-                        data.data(),
-                        data.size());
-                    rv = true;
-                }
-            }
-            else
-            {
-                if (topic.count < topic.frequency)
-                {
-        UXR_AGENT_LOG_MESSAGE(
-            UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
-            get_raw_id(),
-            data.data(),
-            data.size());
-        rv = true;
-    }
-                else
-                {
-                    topic.count = 0;
-                    break;
-                }
-            }
+            std::cout << "[DR] RESTRICT frequency = 0" << std::endl;
+            UXR_AGENT_LOG_MESSAGE(
+                UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
+                get_raw_id(),
+                data.data(),
+                data.size());
+            rv = true;
+        }
+        else if (topic_count < frequency)
+        {
+            std::cout << "[DR] get_raw_id():" << get_raw_id() <<  " count:" << topic_count << " frequency:" << frequency << std::endl;
+            std::cout << "[DR] RESTRICT process" << std::endl;
+            topic_count++;
+            UXR_AGENT_LOG_MESSAGE(
+                UXR_DECORATE_YELLOW("[==>> DDS <<==]"),
+                    get_raw_id(),
+                    data.data(),
+                    data.size());
+            rv = true;
+        }
+        else
+        {
+            std::cout << "[DR] RESTRICT reset" << std::endl;
+            topic_count = 0;
         }
 #elif defined(UAGENT_PROTECT)
         std::chrono::duration<double> diff = std::chrono::system_clock::now() - read_times_[get_raw_id()];
-        float frequency_ = 0.001;
-        for (const auto &topic : topic_info_)
-        {
-            if (topic.objectID == get_raw_id())
-            {
-                frequency_ = topic.frequency;
-                break;
-            }
-        }
 
-        if (diff.count() > frequency_)
+        auto d = diff.count();
+
+        std::cout << "[DR] get_raw_id():" << get_raw_id() << " diff.count():" << d << " frequency:" << frequency << std::endl;
+
+        if (d > frequency)
         {
             read_times_[get_raw_id()] = std::chrono::system_clock::now();
 

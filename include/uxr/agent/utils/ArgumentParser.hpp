@@ -45,6 +45,7 @@
 
 #if defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
 #include <uxr/agent/datareader/DataReader.hpp>
+#include <uxr/agent/datawriter/DataWriter.hpp>
 #endif // defined(UAGENT_RESTRICT) || defined(UAGENT_PROTECT)
 
 #include <termios.h>
@@ -555,6 +556,7 @@ public:
                     while (std::getline(tokenStream, token, ','))
                     {
                         DataReader::topic_frequency_array.push_back(token);
+                        DataWriter::topic_frequency_array.push_back(token);
                     }
                 }
                 for (size_t i = 0; i < DataReader::topic_frequency_array.size(); i++)

@@ -49,7 +49,13 @@ RUN tar -xzvf /usr/local/install.tar.gz -C /usr/local/ &&\
 
 COPY --from=build /agent/agent.refs .
 
+# Copy protect.txt and restrict.txt
+
+COPY protect.txt .
+
+COPY restrict.txt .
+
 RUN ldconfig
 
 ENTRYPOINT ["MicroXRCEAgent"]
-CMD ["--help"]
+CMD ["udp4", "--port", "8888", "-d", "-t", "protect.txt"]

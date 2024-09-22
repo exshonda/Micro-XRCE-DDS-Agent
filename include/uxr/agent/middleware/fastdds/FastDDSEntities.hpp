@@ -256,8 +256,8 @@ class FastDDSDataWriter
 {
 public:
     FastDDSDataWriter(const std::shared_ptr<FastDDSPublisher>& publisher)
-        : publisher_{publisher}
-        , topic_{nullptr}
+        : topic_{nullptr}
+        , publisher_{publisher}
         , ptr_{nullptr}
     {}
 
@@ -275,10 +275,10 @@ public:
     bool write(const std::vector<uint8_t>& data);
     const fastdds::dds::DataWriter* ptr() const;
     const fastdds::dds::DomainParticipant* participant() const;
+    std::shared_ptr<FastDDSTopic> topic_;
 
 private:
     std::shared_ptr<FastDDSPublisher> publisher_;
-    std::shared_ptr<FastDDSTopic> topic_;
     fastdds::dds::DataWriter* ptr_;
 };
 
@@ -311,10 +311,10 @@ public:
             fastdds::dds::SampleInfo& sample_info);
     const fastdds::dds::DataReader* ptr() const;
     const fastdds::dds::DomainParticipant* participant() const;
+    std::shared_ptr<FastDDSTopic> topic_;
 
 private:
     std::shared_ptr<FastDDSSubscriber> subscriber_;
-    std::shared_ptr<FastDDSTopic> topic_;
     fastdds::dds::DataReader* ptr_;
 };
 

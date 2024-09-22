@@ -413,6 +413,7 @@ bool FastDDSMiddleware::create_datawriter_by_xml(
 bool FastDDSMiddleware::create_datawriter_by_bin(
         uint16_t datawriter_id,
         uint16_t publisher_id,
+        std::string& topic_name,
         const dds::xrce::OBJK_DataWriter_Binary& datawriter_xrce)
 {
     bool rv = false;
@@ -425,6 +426,9 @@ bool FastDDSMiddleware::create_datawriter_by_bin(
         {
             if (datawriter->create_by_bin(datawriter_xrce, it_topics->second))
             {
+                const std::string name = datawriter->topic_->get_name();
+                topic_name = name;
+                
                 auto emplace_res = datawriters_.emplace(datawriter_id, std::move(datawriter));
                 rv = emplace_res.second;
                 if (rv)
@@ -495,6 +499,7 @@ bool FastDDSMiddleware::create_datareader_by_xml(
 bool FastDDSMiddleware::create_datareader_by_bin(
         uint16_t datareader_id,
         uint16_t subscriber_id,
+        std::string& topic_name,
         const dds::xrce::OBJK_DataReader_Binary& datareader_xrce)
 {
     bool rv = false;
@@ -507,6 +512,8 @@ bool FastDDSMiddleware::create_datareader_by_bin(
         {
             if (datareader->create_by_bin(datareader_xrce, it_topics->second))
             {
+                const std::string name = datareader->topic_->get_name();
+                topic_name = name;
                 auto emplace_res = datareaders_.emplace(datareader_id, std::move(datareader));
                 rv = emplace_res.second;
                 if (rv)
